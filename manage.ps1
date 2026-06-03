@@ -39,12 +39,33 @@ function Kill-Proc($file) {
     if (Test-Path $file) { Remove-Item $file -Force }
 }
 
+# ---- Port Check ----
+
+function Get-BackendPort {
+    $envFile = Join-Path $BASE_DIR "backend\.env"
+    if (Test-Path $envFile) {
+        $match = Select-String "^APP_PORT=(\d+)" $envFile
+        if ($match) { return $match.Matches.Groups[1].Value }
+    }
+    return "8000"  # fallback: main.py default
+}
+
+function Test-PortInUse($port) {
+    $conn = netstat -an | Select-String "LISTENING" | Select-String ":$port "
+    return ($conn -ne $null)
+}
+
 # ---- Backend ----
 
 function Start-Backend {
     if (Is-Running $BACKEND_PID) {
         Write-Info "backend" "already running (PID $(Read-Pid $BACKEND_PID))"
         return
+    }
+    $port = Get-BackendPort
+    if (Test-PortInUse $port) {
+        Write-Err "backend" "port $port is already in use — aborting startup"
+        exit 1
     }
     $python = "E:\Users\April\miniforge3\envs\polyplex\python.exe"
     if (-not (Test-Path $python)) {
@@ -133,6 +154,24 @@ function Stop-Nginx {
     }
 }
 
+# ---- Kill Port ----
+
+function Invoke-KillPort($port) {
+    $lines = netstat -ano | Select-String ":$port\s" | Select-String "LISTENING"
+    if (-not $lines) {
+        Write-Info "kill-port" "no process is listening on port $port"
+        return
+    }
+    foreach ($line in $lines) {
+        $parts = $line -split '\s+'
+        $procId = $parts[-1]
+        if ($procId -and $procId -match '^\d+$') {
+            taskkill /F /PID $procId 2>$null
+            Write-Ok "kill-port" "killed PID $procId (was listening on port $port)"
+        }
+    }
+}
+
 # ---- Status ----
 
 function Show-Status {
@@ -183,6 +222,13 @@ switch ($Command.ToLower()) {
         Start-Sleep 1
         & $MyInvocation.MyCommand.Path start $Component
     }
+    "kill-port" {
+        if (-not $Component -or $Component -notmatch '^\d+$') {
+            Write-Err "kill-port" "usage: manage.ps1 kill-port <port>"
+            exit 1
+        }
+        Invoke-KillPort $Component
+    }
     "status" {
         Show-Status
     }
@@ -195,6 +241,7 @@ switch ($Command.ToLower()) {
         Write-Host "  start [component]     Start all or a specific component"
         Write-Host "  stop  [component]     Stop all or a specific component"
         Write-Host "  restart [component]   Restart all or a specific component"
+        Write-Host "  kill-port <port>      Kill process occupying a port"
         Write-Host "  status                Show running status of all components"
         Write-Host ""
         Write-Host "Components: backend, frontend, nginx"
@@ -204,6 +251,7 @@ switch ($Command.ToLower()) {
         Write-Host "  manage.ps1 start backend"
         Write-Host "  manage.ps1 stop"
         Write-Host "  manage.ps1 restart nginx"
+        Write-Host "  manage.ps1 kill-port 8000"
         Write-Host "  manage.ps1 status"
     }
 }

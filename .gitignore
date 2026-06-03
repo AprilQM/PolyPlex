@@ -1,0 +1,40 @@
+# ── Node ──
+node_modules/
+dist/
+frontend/dist/
+
+# ── Python ──
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.egg
+.venv/
+venv/
+env/
+
+# ── Environment & Secrets ──
+.env
+backend/.env
+
+# ── Runtime Data ──
+file/
+.manage_pids/
+
+# ── Nginx ──
+nginx/logs/
+nginx/temp/
+nginx/nginx.exe
+
+# ── IDE / Editor ──
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ──
+Thumbs.db
+.DS_Store
+
+# ── Claude ──
+.claude/

@@ -40,7 +40,10 @@
       "Read(//e/Users/April/**)",
       "Read(//e/Users/April/miniforge3/envs//**)",
       "Bash(/e/Users/April/miniforge3/envs/PolyPlex/python *)",
-      "Bash(nohup /e/Users/April/miniforge3/envs/PolyPlex/python.exe main.py)"
+      "Bash(nohup /e/Users/April/miniforge3/envs/PolyPlex/python.exe main.py)",
+      "Bash(git -C \"D:\\\\PolyPlex\" status)",
+      "Bash(git *)",
+      "Bash(Select-String \"nav\")"
     ],
     "additionalDirectories": [
       "D:\\LinkNote\\Backend",
