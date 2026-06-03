@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from app.utils.snowflake import generate_group_id, generate_group_user_relation_id, generate_project_group_id, generate_file_group_id; print\\('group_id:', generate_group_id\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(python -c \"from app.models.groups import Group, GroupUserRelation, ProjectGroup, FileGroup; print\\('OK'\\)\")",
+      "Bash(python -m py_compile \"D:/PolyPlex/backend/app/models/groups.py\")",
+      "Bash(npm install *)",
+      "Bash(cmd.exe /c \"where redis-server 2>nul || echo no redis-server\")",
+      "Bash(cmd.exe *)",
+      "Bash(python manage.py status)",
+      "Bash(python manage.py --help)",
+      "Bash(where npm *)",
+      "Bash(python manage.py stop --all)",
+      "Bash(bash manage.sh status)",
+      "Bash(powershell -ExecutionPolicy Bypass -File manage.ps1 status)",
+      "Bash(powershell -ExecutionPolicy Bypass -Command \"Get-Content manage.ps1 -TotalCount 5 | Format-Hex\")",
+      "Bash(powershell -Command '@ *)",
+      "Bash(powershell -Command \"Get-Content manage.ps1 -Raw | Set-Content -Path manage_utf8.ps1 -Encoding UTF8\")",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"open\\('manage.ps1','r',encoding='utf-8'\\).read\\(\\); open\\('manage.ps1','w',encoding='utf-8-sig'\\).write\\(open\\('manage.ps1','r',encoding='utf-8'\\).read\\(\\)\\)\")",
+      "Bash(powershell -ExecutionPolicy Bypass -NoProfile -File manage.ps1 status)",
+      "Bash(powershell -NoProfile -Command \"& { . .\\\\manage.ps1; Show-Status }\")",
+      "Bash(powershell -NoProfile -Command \".\\\\manage.ps1 -Command status\")",
+      "Bash(powershell -NoProfile -Command \"Write-Host 'test'; .\\\\manage.ps1 status; Write-Host 'done'\")",
+      "Bash(powershell -NoProfile -Command \"Get-Content .\\\\manage.ps1 | Select-Object -First 5\")",
+      "Bash(powershell *)",
+      "Bash(python *)",
+      "Bash(conda run *)",
+      "Bash(curl *)",
+      "Bash(redis-cli EXISTS \"emailRegister:2951755086584e4287530a303f14d5bf\")",
+      "Bash(redis-cli HGETALL \"emailRegister:2951755086584e4287530a303f14d5bf\")",
+      "Bash(\"E:\\\\Users\\\\April\\\\miniforge3\\\\envs\\\\polyplex\\\\python.exe\" main.py)",
+      "Bash(\"E:\\\\Users\\\\April\\\\miniforge3\\\\envs\\\\polyplex\\\\python.exe\" tests/_test_verify.py)",
+      "Bash(taskkill *)",
+      "Bash(npm run *)",
+      "Bash('E:\\\\Users\\\\April\\\\miniforge3\\\\envs\\\\polyplex\\\\python.exe' -c ' *)",
+      "Bash(\"E:\\\\Users\\\\April\\\\miniforge3\\\\envs\\\\polyplex\\\\python.exe\")",
+      "Bash(taskkill /F /IM python.exe)",
+      "Bash(start \"\" \"E:\\\\Users\\\\April\\\\miniforge3\\\\envs\\\\polyplex\\\\python.exe\" main.py)",
+      "Read(//e/Users/April/**)",
+      "Read(//e/Users/April/miniforge3/envs//**)",
+      "Bash(/e/Users/April/miniforge3/envs/PolyPlex/python *)",
+      "Bash(nohup /e/Users/April/miniforge3/envs/PolyPlex/python.exe main.py)"
+    ],
+    "additionalDirectories": [
+      "D:\\LinkNote\\Backend",
+      "D:\\LinkNote\\Frontend"
+    ]
+  }
+}
