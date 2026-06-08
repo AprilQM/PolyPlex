@@ -17,6 +17,10 @@
           <label for="password">密码</label>
           <input id="password" v-model="form.password" type="password" placeholder="请输入密码" required />
         </div>
+        <div class="field">
+          <label for="bio">个人介绍 <span class="optional">(选填)</span></label>
+          <textarea id="bio" v-model="form.bio" placeholder="介绍一下自己吧，这将展示给审核管理员" rows="3"></textarea>
+        </div>
         <p v-if="error" class="error">{{ error }}</p>
         <button type="submit" :class="{ loading }" :disabled="loading">注册</button>
       </form>
@@ -45,7 +49,7 @@ import { useUserStore } from '@/stores/useUserStore'
 const router = useRouter()
 const userStore = useUserStore()
 
-const form = reactive({ username: '', password: '', email: '' })
+const form = reactive({ username: '', password: '', email: '', bio: '' })
 const loading = ref(false)
 const error = ref('')
 const emailSent = ref(false)
@@ -60,6 +64,7 @@ async function handleRegister() {
       form.username,
       form.password,
       form.email,
+      form.bio,
     )
     registeredEmail.value = form.email
     emailSent.value = true
@@ -112,8 +117,12 @@ h1 { text-align: center; margin-bottom: 24px; }
 h2 { text-align: center; margin: 16px 0 12px; font-size: 18px; color: var(--green-deep-500); }
 .field { margin-bottom: 16px; }
 .field label { display: block; margin-bottom: 6px; font-size: 14px; color: var(--gray-700); }
-.field input { width: 100%; padding: 10px 12px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 14px; box-sizing: border-box; }
-.field input:focus { border-color: var(--green-deep-500); outline: none; }
+.field input,
+.field textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 14px; box-sizing: border-box; font-family: inherit; }
+.field input:focus,
+.field textarea:focus { border-color: var(--green-deep-500); outline: none; }
+.field textarea { resize: vertical; min-height: 60px; }
+.optional { color: var(--gray-400); font-weight: 400; font-size: 12px; }
 .error { color: var(--red-500); font-size: 13px; margin-bottom: 12px; }
 button { width: 100%; padding: 10px; background: var(--green-deep-500); color: var(--gray-0); border: none; border-radius: 6px; font-size: 15px; cursor: pointer; }
 button:hover { background: var(--green-deep-600); }

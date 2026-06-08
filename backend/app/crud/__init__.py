@@ -5,7 +5,7 @@ from app.crud.users import (
     # User
     get_user, get_user_by_username, get_user_by_email, get_user_by_job_number, create_user, update_user,
     delete_user, update_user_login_time,
-    get_user_list, count_users,
+    get_user_list, count_users, get_users_by_ids,
     # UserTag
     get_user_tag, get_user_tag_by_name, create_user_tag, update_user_tag,
     delete_user_tag, get_all_user_tags,
@@ -23,6 +23,9 @@ from app.crud.group_user_relations import (
     add_member, remove_member, update_member_role,
     get_group_members, get_user_group_ids,
     is_user_in_group, is_user_admin, is_user_banned,
+    is_admin, is_ban,
+    add_user_to_pending, approve_user, reject_user,
+    is_user_pending, get_pending_users,
 )
 from app.crud.file_access import (
     grant_project_access, revoke_project_access, get_project_groups,
@@ -119,7 +122,7 @@ __all__ = [
     # 用户
     "get_user", "get_user_by_username", "get_user_by_email", "get_user_by_job_number", "create_user", "update_user",
     "delete_user", "update_user_login_time",
-    "get_user_list", "count_users",
+    "get_user_list", "count_users", "get_users_by_ids",
     "get_user_tag", "get_user_tag_by_name", "create_user_tag", "update_user_tag",
     "delete_user_tag", "get_all_user_tags",
     "get_user_tag_relation", "add_user_tag", "remove_user_tag", "get_user_tags",
@@ -150,6 +153,9 @@ __all__ = [
     "add_member", "remove_member", "update_member_role",
     "get_group_members", "get_user_group_ids",
     "is_user_in_group", "is_user_admin", "is_user_banned",
+    "is_admin", "is_ban",
+    "add_user_to_pending", "approve_user", "reject_user",
+    "is_user_pending", "get_pending_users",
     "grant_project_access", "revoke_project_access", "get_project_groups",
     "grant_file_access", "revoke_file_access", "get_file_groups",
     # 文件

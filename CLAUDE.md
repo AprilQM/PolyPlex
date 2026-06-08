@@ -19,12 +19,23 @@ python main.py                          # Start server at 0.0.0.0:8000
 # Frontend
 cd frontend
 npm install
-npm run dev                             # Vite dev server
-npm run build                           # Production build
+npm run dev                             # Vite dev server (localhost:5173)
+npm run build                           # Production build → frontend/dist/
 npm run preview                         # Preview production build
+
+# All-in-one (requires nginx/ + dist/)
+.\manage.ps1 start                      # Start backend + frontend + nginx
+.\manage.ps1 stop                       # Stop all
+.\manage.ps1 status                     # Show running status
+.\manage.ps1 kill-port 8000             # Kill process on port 8000
+
+# Tests (backend)
+cd backend
+pytest                                  # Run all tests
+pytest tests/test_auth_flow.py -v       # Single test file
 ```
 
-Both servers run independently — backend on `0.0.0.0:8000` (FastAPI + uvicorn), frontend on Vite default (usually `localhost:5173`).
+Backend: `0.0.0.0:8000` (FastAPI + uvicorn). Frontend dev: `localhost:5173` (Vite). Production: nginx `localhost:80` reverse-proxies API to backend and serves SPA from `frontend/dist/`.
 
 ## Monorepo Layout
 
@@ -33,17 +44,15 @@ PolyPlex/
 ├── backend/
 │   ├── main.py                         # FastAPI app entry, lifespan auto-creates DB + system user
 │   ├── requirements.txt
+│   ├── .env.example                    # Environment variable template
 │   └── app/
 │       ├── api/                        # FastAPI route definitions (thin layer, no business logic)
-│       ├── core/                       # database.py (async MySQL engine, session factory)
-│       ├── models/                     # SQLAlchemy ORM models (9 model groups)
-│       ├── crud/                       # DB operations (11 modules, 1:1 with models)
-│       ├── services/                   # Business logic (branch_service, file_service, component_service)
-│       ├── schemas/                    # Pydantic schemas (planned, dir exists)
-│       ├── middleware/                 # Auth/logging/error middleware (planned, dir exists)
-│       ├── utils/                      # Snowflake ID generator, hash utilities
+│       ├── core/                       # database, auth/JWT, redis_client, rsa_key, email, git_config
+│       ├── models/                     # SQLAlchemy ORM models (users, projects, pages, branches, versions, components, merge_requests, members, files, groups, notifications)
+│       ├── crud/                       # DB operations (1:1 with model groups, 15 modules)
+│       ├── services/                   # Business logic (branch, component, file, file_access, git)
 │       ├── page_components/            # 48 component classes across 8 categories (ABC base class)
-│       └── project_templates/          # 93 page templates across 12 domains
+│       └── project_templates/          # 97 page templates across 12 domains
 ├── frontend/
 │   └── src/
 │       ├── main.js                     # Vue app entry (Pinia + router setup)
@@ -51,10 +60,17 @@ PolyPlex/
 │       ├── router/index.js             # Routes: /home, /workbench/*, /form/*, /admin
 │       ├── stores/                     # Pinia stores (useUserStore, useSecondaryNavStore)
 │       ├── layouts/                    # WorkbenchLayout, FormLayout, AdminLayout
-│       ├── views/                      # Home (landing), workbench/*, form/* (Login/Register)
-│       ├── components/                 # Reusable Vue components
-│       ├── composables/                # Vue composables (empty/planned)
-│       └── styles/                     # Global CSS (index.css, font.css, color.css)
+│       ├── views/                      # Home (landing), 6 workbench views, 3 form views
+│       ├── components/                 # Reusable Vue components (nav, etc.)
+│       ├── composables/                # url.js helper
+│       └── styles/                     # Global CSS (index.css, font.css, color.css with design tokens)
+├── nginx/
+│   └── conf/nginx.conf                # Reverse proxy: API → :8000, SPA → frontend/dist/
+├── tests/
+│   └── test_auth_flow.py              # Auth flow integration tests
+├── manage.ps1                         # Process manager (start/stop/restart/status/kill-port)
+├── .gitignore
+└── docs/superpowers/                  # Design docs and implementation plans
 ```
 
 ## Architecture — Backend
@@ -66,9 +82,25 @@ Client → app/api/ → app/services/ → app/crud/ → app/models/ → MySQL
 ```
 
 - **api/** — FastAPI route handlers. Parameter validation only, no business logic. Routes call into services or directly into crud for simple operations.
-- **services/** — Business logic layer. Orchestrates multi-step operations (branch cloning, merge execution, file upload with dedup). Currently has `branch_service.py`, `file_service.py`, `component_service.py`.
+- **services/** — Business logic layer. Orchestrates multi-step operations. Modules: `branch_service.py` (branch cloning, merge execution, commit), `file_service.py` (file upload with dedup), `component_service.py`, `file_access_service.py` (access control), `git_service.py` (Git HTTP Smart Protocol, refs/advertisement, pack upload).
 - **crud/** — Database operations. Every function accepts `db: AsyncSession` as first param and commits internally. Return ORM objects or None (never HTTP errors).
 - **models/** — SQLAlchemy declarative models. Use Snowflake IDs (typed, bigint) as primary keys. All timestamps are `BigInteger` (Unix epoch seconds).
+
+### Auth & Core Infrastructure
+
+- **RSA encryption** — Frontend encrypts passwords with `jsencrypt` (PKCS#1 v1.5) using backend's RSA public key. Backend decrypts with `cryptography` library. Keys auto-generated on first startup. See `app/core/rsa_key.py`.
+- **Email verification** — Registration sends verification email via SMTP (QQ mail). Redis stores pending registrations with 30-min TTL. Verify-code endpoint activates user and returns JWT. See `app/core/email.py`, `app/api/auth.py` `POST /register`, `POST /verify-code`.
+- **JWT auth** — `create_access_token()` in `app/core/auth.py`. Token contains `user_id`, `username`, `job_number`, `is_system`. Token-based auth check in router guard + `get_current_user` dependency.
+- **Redis** — Used for email verification codes, rate limiting. Configured in `.env` (`REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`). See `app/core/redis_client.py`.
+- **Git tokens** — Users have a `git_token_hash` column. Tokens are SHA-256 hashed, one-time display on generation. Used for Git HTTP Smart Protocol authentication.
+
+### Git HTTP Backend
+
+PolyPlex implements Git HTTP Smart Protocol at `/api/git/<repo>` supporting `git clone/push/fetch`. See `backend/app/api/git.py`:
+- `GET /api/git/<repo>/info/refs?service=git-upload-pack` — Advertise refs (clone/fetch)
+- `POST /api/git/<repo>/git-upload-pack` — Serve pack data (fetch)
+- `POST /api/git/<repo>/git-receive-pack` — Accept pack data (push)
+- Auth: Basic auth via username + git_token (falls back to password). Git repos stored under `FILE_PATH/git/`.
 
 ### Core Data Entities & Relationships
 
@@ -79,6 +111,8 @@ Project ──→ ProjectMember(s) with RoleType (OWNER/ADMIN/CONTRIBUTOR/VIEWER
 Project ──→ ProjectTag(s) via ProjectTagRelation
 File ──→ FilePackage(s) via FilePackageRelation
 User ──→ UserTag(s) via UserTagRelation
+User ──→ Group(s) via GroupUserRelation
+File ──→ FileAccessControl(s) — permission-based file access
 ```
 
 ### Key Design Decisions

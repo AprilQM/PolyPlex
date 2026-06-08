@@ -18,10 +18,12 @@ class User(Base):
     username = Column(String(50), unique=True, index=True, nullable=False)
     email = Column(String(50), unique=True, index=True)
     password_hash = Column(String(128), nullable=False)
-    job_number = Column(String(20), unique=True, index=True, nullable=False)
+    job_number = Column(String(20), unique=True, index=True, nullable=True)
     is_system = Column(Boolean, default=False)
     login_at = Column(BigInteger, default=0)
     git_token_hash = Column(String(64), nullable=True, index=True)
+    bio = Column(String(500), nullable=True)
+    reject_reason = Column(String(500), nullable=True)
     created_at = Column(BigInteger, default=lambda: int(time.time()), nullable=False)
     updated_at = Column(BigInteger, default=lambda: int(time.time()), nullable=False)
 

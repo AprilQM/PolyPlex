@@ -3,6 +3,7 @@
 """
 import os
 import time
+import asyncio
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -11,6 +12,7 @@ SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.qq.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "465"))
 SMTP_SENDER = os.getenv("SMTP_SENDER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:5173")
 
 # ── 品牌色 ──
 GREEN_DEEP = "#1a4d3e"
@@ -56,18 +58,50 @@ def _build_verify_button(url: str) -> str:
 <p style="color:{GRAY_500};font-size:13px;text-align:center;margin:12px 0 0;">或复制链接到浏览器访问：<br><span style="color:{GRAY_500};word-break:break-all;">{url}</span></p>'''
 
 
-def send_verify_email(receiver: str, code: str, username: str, base_url: str = "http://localhost:5173") -> bool:
+def _build_login_button(url: str) -> str:
+    return f'''
+<table cellpadding="0" cellspacing="0" style="margin:24px auto;">
+<tr><td align="center" style="background:{GREEN_DEEP};border-radius:8px;padding:0;">
+<a href="{url}" target="_blank" style="display:inline-block;padding:12px 36px;color:#fff;text-decoration:none;font-size:15px;font-weight:500;border-radius:8px;">登录 PolyPlex</a>
+</td></tr>
+</table>
+<p style="color:{GRAY_500};font-size:13px;text-align:center;margin:12px 0 0;">或复制链接到浏览器访问：<br><span style="color:{GRAY_500};word-break:break-all;">{url}</span></p>'''
+
+
+async def send_approval_email(receiver: str, username: str) -> bool:
+    """发送审核通过通知邮件"""
+    login_url = f"{APP_BASE_URL}/form/login"
+    title = "审核通过通知"
+    content = f"您好 {username}，<br><br>恭喜您！您的 PolyPlex 账号已通过管理员审核。<br><br>现在您可以登录系统，开始使用所有功能：<br>创建项目、邀请团队成员、探索灵感、协作创作。<br><br>欢迎加入 PolyPlex！"
+    login_button = _build_login_button(login_url)
+
+    return await _send(receiver, title, content, login_button)
+
+
+async def send_rejection_email(receiver: str, username: str, reason: str, bio: str = "") -> bool:
+    """发送审核拒绝通知邮件（含理由和自我介绍）"""
+    title = "审核未通过"
+    escaped_reason = reason.replace("\n", "<br>")
+    escaped_bio = bio.replace("\n", "<br>") if bio else ""
+    content = f"您好 {username}，<br><br>很遗憾，您的 PolyPlex 账号申请未通过管理员审核。"
+    if escaped_bio:
+        content += f"<br><br>您提交的自我介绍：<br><span style=\"color:#6b7280;font-style:italic;\">{escaped_bio}</span>"
+    content += f"<br><br>拒绝原因：<br><span style=\"color:#6b7280;font-style:italic;\">{escaped_reason}</span><br><br>如有疑问，请联系管理员获取更多信息。"
+    return await _send(receiver, title, content)
+
+
+async def send_verify_email(receiver: str, code: str, username: str) -> bool:
     """发送邮箱验证邮件"""
-    verify_url = f"{base_url}/form/verify?code={code}"
+    verify_url = f"{APP_BASE_URL}/form/verify?code={code}"
     title = "验证您的邮箱地址"
     content = f"您好 {username}，<br><br>您正在注册 PolyPlex 账号，请点击下方按钮验证您的邮箱：<br><br>邮箱：{receiver}<br>有效期：30 分钟"
     verify_button = _build_verify_button(verify_url)
 
-    return _send(receiver, title, content, verify_button)
+    return await _send(receiver, title, content, verify_button)
 
 
-def _send(receiver: str, title: str, content: str, verify_button: str = "") -> bool:
-    """底层 SMTP 发送"""
+async def _send(receiver: str, title: str, content: str, verify_button: str = "") -> bool:
+    """底层 SMTP 发送（异步，在线程池执行）"""
     msg = MIMEMultipart()
     msg["From"] = SMTP_SENDER
     msg["To"] = receiver
@@ -80,6 +114,11 @@ def _send(receiver: str, title: str, content: str, verify_button: str = "") -> b
 
     msg.attach(MIMEText(html, "html", "utf-8"))
 
+    return await asyncio.to_thread(_smtp_send, msg, receiver)
+
+
+def _smtp_send(msg: MIMEMultipart, receiver: str) -> bool:
+    """同步 SMTP 发送（在 asyncio.to_thread 中执行）"""
     try:
         server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
         server.login(SMTP_SENDER, SMTP_PASSWORD)

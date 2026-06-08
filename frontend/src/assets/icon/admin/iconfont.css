@@ -1,0 +1,45 @@
+@font-face {
+  font-family: "iconfont-admin";
+  src: url('iconfont.ttf?t=1780934278001') format('truetype');
+}
+
+.iconfont {
+  font-family: "iconfont-admin" !important;
+  font-size: 16px;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.icon-dashboard:before {
+  content: "\e78b";
+}
+
+.icon-file:before {
+  content: "\e7bb";
+}
+
+.icon-logout:before {
+  content: "\e64f";
+}
+
+.icon-arrow-left:before {
+  content: "\e841";
+}
+
+.icon-user-check:before {
+  content: "\e678";
+}
+
+.icon-users:before {
+  content: "\e679";
+}
+
+.icon-search:before {
+  content: "\e626";
+}
+
+.icon-check-circle:before {
+  content: "\e9af";
+}
+

@@ -4,6 +4,16 @@ import { JSEncrypt } from 'jsencrypt'
 
 const API_BASE = '/api'
 
+/** 从 JWT token payload 中检查 exp 是否已过期（前端快速判断，不验证签名） */
+function isTokenExpired(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return !payload.exp || Date.now() >= payload.exp * 1000
+  } catch {
+    return true
+  }
+}
+
 /** 安全解析 fetch 响应，非 JSON 时返回文本消息 */
 async function parseJsonSafe(res) {
   const text = await res.text()
@@ -26,6 +36,9 @@ export const useUserStore = defineStore('user', () => {
 
   // 其他数据
   const messageCount = ref(0)
+
+  /** 审核状态 */
+  const isApproved = ref(true) // 默认 true，兼容旧用户（不在 pending 组）
 
   /** 缓存的 RSA 公钥 */
   let _publicKey = null
@@ -82,12 +95,18 @@ export const useUserStore = defineStore('user', () => {
     if (saved) {
       try {
         const data = JSON.parse(saved)
+        // token 已过期 → 清除
+        if (data.token && isTokenExpired(data.token)) {
+          localStorage.removeItem('user')
+          return
+        }
         id.value = data.id || 0
         _username.value = data.username || ''
         _email.value = data.email || ''
         token.value = data.token || ''
         jobNumber.value = data.job_number || ''
         isSystem.value = data.is_system || false
+        isApproved.value = data.is_approved !== false
       } catch {
         localStorage.removeItem('user')
       }
@@ -102,6 +121,7 @@ export const useUserStore = defineStore('user', () => {
       token: token.value,
       job_number: jobNumber.value,
       is_system: isSystem.value,
+      is_approved: isApproved.value,
     }))
   }
 
@@ -132,16 +152,17 @@ export const useUserStore = defineStore('user', () => {
     isSystem.value = data.user.is_system || false
 
     saveToStorage()
+    await checkApprovalStatus()
     return data
   }
 
-  async function register(username, password, email) {
+  async function register(username, password, email, bio = '') {
     const encrypted_password = await encryptPassword(password)
 
     const res = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, encrypted_password, email }),
+      body: JSON.stringify({ username, encrypted_password, email, bio }),
     })
     if (!res.ok) {
       const err = await parseJsonSafe(res)
@@ -172,6 +193,7 @@ export const useUserStore = defineStore('user', () => {
     token.value = data.access_token
     jobNumber.value = data.user.job_number || ''
     isSystem.value = data.user.is_system || false
+    isApproved.value = false // 新注册用户处于待审核状态
 
     saveToStorage()
     return data
@@ -196,6 +218,21 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
+  async function checkApprovalStatus() {
+    if (!token.value) {
+      isApproved.value = true
+      return
+    }
+    try {
+      const { http } = await import('@/composables/http')
+      const res = await http('/auth/approval-status')
+      const data = await res.json()
+      isApproved.value = data.status === 'approved'
+    } catch {
+      isApproved.value = true
+    }
+  }
+
   // 初始化
   initFromStorage()
 
@@ -210,10 +247,12 @@ export const useUserStore = defineStore('user', () => {
     messageCount,
     hasUnreadMessage,
     isLoggedIn,
+    isApproved,
     login,
     register,
     verifyCode,
     logout,
     getAuthHeaders,
+    checkApprovalStatus,
   }
 })

@@ -28,6 +28,7 @@
         <div class="right">
             <button :class="['notif-btn', 'iconfont', 'icon-tongzhi', { 'has-notice': userStore.hasUnreadMessage }]"
                 @click="urlUtils.jump('/workbench/notice')"></button>
+            <button class="logout-btn iconfont icon-logout" title="退出登录" @click="handleLogout"></button>
             <div class="user">
                 <img :src="userStore.avatar" @error="handleAvatarError" class="avatar"
                     @click="urlUtils.jump('/workbench/user-space/' + userStore.id)">
@@ -61,6 +62,11 @@ const isAssist = computed(() => route.path === '/workbench/assist')
 
 const handleAvatarError = (e) => {
     e.target.src = defaultAvatar
+}
+
+function handleLogout() {
+    userStore.logout()
+    router.push('/home')
 }
 </script>
 
@@ -191,6 +197,26 @@ const handleAvatarError = (e) => {
 .notif-btn:hover {
     background: var(--gray-50);
     color: var(--gray-700);
+}
+
+.logout-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--gray-400);
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logout-btn:hover {
+    background: var(--red-50);
+    color: var(--red-500);
 }
 
 .notif-btn::after {

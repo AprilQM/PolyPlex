@@ -89,6 +89,28 @@ function Stop-Backend {
 
 # ---- Frontend ----
 
+# ---- Frontend Build ----
+
+function Build-Frontend {
+    $npm = Get-Command "npm.cmd" -ErrorAction SilentlyContinue
+    if (-not $npm) { $npm = Get-Command "npm" -ErrorAction SilentlyContinue }
+    if (-not $npm) {
+        Write-Err "frontend" "npm not found, please install Node.js"
+        return $false
+    }
+    Push-Location "$BASE_DIR/frontend"
+    Write-Info "frontend" "building..."
+    $proc = Start-Process -FilePath "cmd.exe" -ArgumentList "/c npm run build" -NoNewWindow -Wait -PassThru
+    Pop-Location
+    if ($proc.ExitCode -eq 0) {
+        Write-Ok "frontend" "build succeeded"
+        return $true
+    } else {
+        Write-Err "frontend" "build failed (exit $($proc.ExitCode))"
+        return $false
+    }
+}
+
 function Start-Frontend {
     if (Is-Running $FRONTEND_PID) {
         Write-Info "frontend" "already running (PID $(Read-Pid $FRONTEND_PID))"
@@ -200,8 +222,7 @@ switch ($Command.ToLower()) {
             "nginx"    { Start-Nginx }
             default {
                 Start-Backend
-                Start-Frontend
-                Start-Nginx
+                if (Build-Frontend) { Start-Nginx }
             }
         }
     }
@@ -218,9 +239,38 @@ switch ($Command.ToLower()) {
         }
     }
     "restart" {
-        & $MyInvocation.MyCommand.Path stop $Component
-        Start-Sleep 1
-        & $MyInvocation.MyCommand.Path start $Component
+        if ($Component.ToLower() -eq "frontend") {
+            # restart frontend → 开发模式重启（kill dev server + 重新启动）
+            Stop-Frontend
+            Start-Sleep 1
+            Start-Frontend
+        } elseif ($Component -ne "") {
+            # restart backend / nginx
+            & $MyInvocation.MyCommand.Path stop $Component
+            Start-Sleep 1
+            & $MyInvocation.MyCommand.Path start $Component
+        } else {
+            # restart → 生产模式：停止全部 + 构建 + 启动
+            & $MyInvocation.MyCommand.Path stop
+            Start-Sleep 1
+            Start-Backend
+            if (Build-Frontend) { Start-Nginx }
+        }
+    }
+    "build" {
+        switch ($Component.ToLower()) {
+            "frontend" { Build-Frontend }
+            default    { Build-Frontend }
+        }
+    }
+    "rebuild" {
+        switch ($Component.ToLower()) {
+            "frontend" {
+                Stop-Nginx
+                Start-Sleep 1
+                if (Build-Frontend) { Start-Nginx }
+            }
+        }
     }
     "kill-port" {
         if (-not $Component -or $Component -notmatch '^\d+$') {
@@ -238,19 +288,31 @@ switch ($Command.ToLower()) {
         Write-Host "Usage: manage.ps1 <command> [component]"
         Write-Host ""
         Write-Host "Commands:"
-        Write-Host "  start [component]     Start all or a specific component"
-        Write-Host "  stop  [component]     Stop all or a specific component"
-        Write-Host "  restart [component]   Restart all or a specific component"
-        Write-Host "  kill-port <port>      Kill process occupying a port"
-        Write-Host "  status                Show running status of all components"
+        Write-Host "  start [component]       Start all (build frontend, start backend + nginx)"
+        Write-Host "                          or a specific component"
+        Write-Host "  stop  [component]       Stop all or a specific component"
+        Write-Host "  restart [component]     Restart:"
+        Write-Host "    restart               stop all + build frontend + start backend + nginx"
+        Write-Host "    restart frontend      kill dev server + restart dev server"
+        Write-Host "    restart backend/nginx  stop + start 指定组件"
+        Write-Host "  build frontend          Build frontend only (npm run build)"
+        Write-Host "  rebuild frontend        Stop nginx + build frontend + start nginx"
+        Write-Host "  kill-port <port>        Kill process occupying a port"
+        Write-Host "  status                  Show running status of all components"
         Write-Host ""
         Write-Host "Components: backend, frontend, nginx"
+        Write-Host "  'start frontend' runs the Vite dev server (for development)"
+        Write-Host "  'start' (default) builds frontend + starts nginx (for production)"
+        Write-Host "  'restart frontend' recycles the Vite dev server"
+        Write-Host "  'rebuild frontend' rebuilds production bundle and reloads nginx"
         Write-Host ""
         Write-Host "Examples:"
         Write-Host "  manage.ps1 start"
         Write-Host "  manage.ps1 start backend"
         Write-Host "  manage.ps1 stop"
         Write-Host "  manage.ps1 restart nginx"
+        Write-Host "  manage.ps1 build frontend"
+        Write-Host "  manage.ps1 rebuild frontend"
         Write-Host "  manage.ps1 kill-port 8000"
         Write-Host "  manage.ps1 status"
     }

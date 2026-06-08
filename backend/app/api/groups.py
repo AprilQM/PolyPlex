@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.api.deps import get_current_user_id
+from app.api.deps import get_current_user, require_active_user
 from app.crud.groups import (
     get_group, get_group_by_name, create_group, update_group, delete_group,
     get_user_groups, get_all_groups,
@@ -28,9 +28,10 @@ router = APIRouter(prefix="/api/groups", tags=["groups"])
 async def create_group_route(
     name: str,
     description: Optional[str] = None,
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(require_active_user),
     db: AsyncSession = Depends(get_db),
 ):
+    user_id = current_user["id"]
     existing = await get_group_by_name(db, name)
     if existing:
         raise HTTPException(409, "Group name already exists")
@@ -42,9 +43,10 @@ async def create_group_route(
 async def list_groups(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    user_id = current_user["id"]
     groups = await get_user_groups(db, user_id)
     return {
         "items": [
@@ -58,7 +60,7 @@ async def list_groups(
 @router.get("/{group_id}")
 async def get_group_route(
     group_id: int,
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     group = await get_group(db, group_id)
@@ -80,7 +82,7 @@ async def update_group_route(
     group_id: int,
     name: Optional[str] = None,
     description: Optional[str] = None,
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(require_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     group = await update_group(db, group_id, name=name, description=description)
@@ -92,7 +94,7 @@ async def update_group_route(
 @router.delete("/{group_id}")
 async def delete_group_route(
     group_id: int,
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(require_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     success = await delete_group(db, group_id)
@@ -106,7 +108,7 @@ async def add_member_route(
     group_id: int,
     member_user_id: int,
     role: str = "member",
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(require_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     group = await get_group(db, group_id)
@@ -123,7 +125,7 @@ async def add_member_route(
 async def remove_member_route(
     group_id: int,
     member_user_id: int,
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(require_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     success = await remove_member(db, group_id, member_user_id)
@@ -137,7 +139,7 @@ async def update_member_role_route(
     group_id: int,
     member_user_id: int,
     role: str,
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(require_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     relation = await update_member_role(db, group_id, member_user_id, GroupRole(role))
@@ -150,7 +152,7 @@ async def update_member_role_route(
 async def grant_project_route(
     group_id: int,
     project_id: int,
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(require_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     try:
@@ -164,7 +166,7 @@ async def grant_project_route(
 async def revoke_project_route(
     group_id: int,
     project_id: int,
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(require_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     success = await revoke_project_access(db, project_id, group_id)
@@ -177,7 +179,7 @@ async def revoke_project_route(
 async def grant_file_route(
     group_id: int,
     file_uuid: str,
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(require_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     file_result = await db.execute(select(File).where(File.uuid == file_uuid))
@@ -195,7 +197,7 @@ async def grant_file_route(
 async def revoke_file_route(
     group_id: int,
     file_uuid: str,
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(require_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     file_result = await db.execute(select(File).where(File.uuid == file_uuid))

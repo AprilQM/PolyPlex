@@ -1,0 +1,37 @@
+@font-face {
+  font-family: "iconfont-form";
+  src: url('iconfont.ttf?t=1780934414777') format('truetype');
+}
+
+.iconfont {
+  font-family: "iconfont-form" !important;
+  font-size: 16px;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.icon-clock:before {
+  content: "\e65b";
+}
+
+.icon-ban:before {
+  content: "\e624";
+}
+
+.icon-check:before {
+  content: "\e615";
+}
+
+.icon-clock-alert:before {
+  content: "\e836";
+}
+
+.icon-check-done-02:before {
+  content: "\e729";
+}
+
+.icon-close-circle:before {
+  content: "\e9be";
+}
+

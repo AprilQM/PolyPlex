@@ -96,8 +96,8 @@ async def get_all_groups(
 
 
 async def ensure_default_groups(db: AsyncSession) -> dict[str, Group]:
-    """确保三个默认系统组存在，返回 {name: group} 字典"""
-    default_names = ["admin", "default", "ban"]
+    """确保默认系统组存在，返回 {name: group} 字典"""
+    default_names = ["admin", "default", "ban", "pending_approval", "rejected"]
     groups = {}
     for name in default_names:
         group = await get_group_by_name(db, name)

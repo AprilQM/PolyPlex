@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.responses import Response
 
 from app.core.database import get_db
-from app.api.deps import get_current_user_id
+from app.api.deps import require_not_banned, get_current_user, require_active_user
 from app.services.file_service import FileService
 from app.services.file_access_service import check_file_access
 from app.crud.files import get_file_by_uuid, get_user_files, count_user_files
@@ -23,9 +23,10 @@ async def upload_file(
     repo_id: Optional[int] = Form(None),
     git_path: Optional[str] = Form(None),
     x_file_hash: Optional[str] = Header(None),
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(require_active_user),
     db: AsyncSession = Depends(get_db),
 ):
+    user_id = current_user["id"]
     svc = FileService(db)
     record = await svc.upload_file(
         file=file,
@@ -49,9 +50,10 @@ async def upload_file(
 @router.get("/{file_uuid}")
 async def get_file_meta(
     file_uuid: str,
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    user_id = current_user["id"]
     record = await get_file_by_uuid(db, file_uuid)
     if not record or record.is_deleted:
         raise HTTPException(404, "File not found")
@@ -73,9 +75,10 @@ async def get_file_meta(
 @router.get("/{file_uuid}/download")
 async def download_file(
     file_uuid: str,
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    user_id = current_user["id"]
     svc = FileService(db)
     record = await svc.get_file_by_uuid(file_uuid)
     if not record or record.is_deleted:
@@ -101,9 +104,10 @@ async def list_files(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     file_type: Optional[str] = Query(None),
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    user_id = current_user["id"]
     if file_type:
         from app.crud.files import get_files_by_type
         files = await get_files_by_type(db, file_type, page, page_size)
@@ -136,9 +140,10 @@ async def list_files(
 @router.delete("/{file_uuid}")
 async def delete_file_route(
     file_uuid: str,
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(require_active_user),
     db: AsyncSession = Depends(get_db),
 ):
+    user_id = current_user["id"]
     svc = FileService(db)
     record = await svc.get_file_by_uuid(file_uuid)
     if not record or record.is_deleted:
@@ -152,9 +157,10 @@ async def delete_file_route(
 @router.put("/{file_uuid}/restore")
 async def restore_file_route(
     file_uuid: str,
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(require_active_user),
     db: AsyncSession = Depends(get_db),
 ):
+    user_id = current_user["id"]
     record = await get_file_by_uuid(db, file_uuid)
     if not record:
         raise HTTPException(404, "File not found")
@@ -170,9 +176,10 @@ async def update_file_meta(
     file_uuid: str,
     target_type: Optional[str] = Body(None),
     target_id: Optional[int] = Body(None),
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(require_active_user),
     db: AsyncSession = Depends(get_db),
 ):
+    user_id = current_user["id"]
     record = await get_file_by_uuid(db, file_uuid)
     if not record or record.is_deleted:
         raise HTTPException(404, "File not found")
@@ -189,9 +196,10 @@ async def update_file_meta(
 @router.post("/batch-delete")
 async def batch_delete_files(
     uuids: list[str],
-    user_id: int = Depends(get_current_user_id),
+    current_user: dict = Depends(require_active_user),
     db: AsyncSession = Depends(get_db),
 ):
+    user_id = current_user["id"]
     from app.crud.files import batch_delete_files as crud_batch_delete
     from sqlalchemy import select
     from app.models.files import File

@@ -12,7 +12,7 @@
       <!-- 验证成功 -->
       <template v-else-if="state === 'success'">
         <div class="icon-circle success">
-          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <i class="iconfont icon-check" style="font-size:32px"></i>
         </div>
         <h2>邮箱验证成功</h2>
         <p class="desc">您的邮箱已通过验证，即将跳转至工作台...</p>
@@ -22,7 +22,7 @@
       <!-- 已过期 -->
       <template v-else-if="state === 'expired'">
         <div class="icon-circle expired">
-          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <i class="iconfont icon-clock-alert" style="font-size:32px"></i>
         </div>
         <h2>链接已过期</h2>
         <p class="desc">该验证链接已过期（有效期 30 分钟），请重新注册。</p>
@@ -32,7 +32,7 @@
       <!-- 已被使用 -->
       <template v-else-if="state === 'used'">
         <div class="icon-circle used">
-          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <i class="iconfont icon-check-done-02" style="font-size:32px"></i>
         </div>
         <h2>该链接已被使用</h2>
         <p class="desc">该验证码已使用过，您的账号已经激活。</p>
@@ -42,7 +42,7 @@
       <!-- 无效链接 -->
       <template v-else-if="state === 'invalid'">
         <div class="icon-circle invalid">
-          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          <i class="iconfont icon-close-circle" style="font-size:32px"></i>
         </div>
         <h2>无效的验证链接</h2>
         <p class="desc">{{ errorMsg }}</p>
@@ -57,6 +57,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/useUserStore'
+import '@/assets/icon/form/iconfont.css'
 
 const route = useRoute()
 const router = useRouter()
@@ -79,7 +80,7 @@ onMounted(async () => {
   try {
     await userStore.verifyCode(code)
     state.value = 'success'
-    setTimeout(() => router.push('/workbench/dashboard'), 2000)
+    setTimeout(() => router.push('/form/pending-approval'), 2000)
   } catch (e) {
     const msg = e.message
     if (msg.includes('已过期') || msg.includes('无效')) {

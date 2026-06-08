@@ -1,39 +1,28 @@
-"""认证 API 路由 — 登录 / 注册 / 邮箱验证 / 公钥"""
+"""认证 API 路由"""
 import uuid
-import json
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
 
+from app.schemas import EncryptedLoginRequest, EncryptedRegisterRequest, VerifyCodeRequest
 from app.core.database import get_db
 from app.core.auth import create_access_token, generate_git_token
 from app.core.rsa_key import get_public_key_pem, decrypt_password
 from app.core.redis_client import get_redis
-from app.core.email import send_verify_email
+from app.core.email import send_verify_email, APP_BASE_URL
 from app.crud.users import (
     get_user_by_username, get_user_by_email, get_user_by_job_number,
     create_user, update_user_login_time, update_git_token_hash,
 )
 from app.crud.users import get_user_tag_by_name, add_user_tag, create_user_tag
+from app.crud.group_user_relations import add_user_to_pending, reappeal_user
+from app.crud.groups import get_group_by_name
+from app.crud.group_user_relations import remove_member
 from app.utils.hash import verify_password, hash_password
 from app.api.deps import get_current_user
+from app.crud.group_user_relations import is_user_pending, is_user_rejected, is_ban
+from app.crud.users import get_user as crud_get_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-
-
-class EncryptedLoginRequest(BaseModel):
-    username: str
-    encrypted_password: str
-
-
-class EncryptedRegisterRequest(BaseModel):
-    username: str
-    encrypted_password: str
-    email: str
-
-
-class VerifyCodeRequest(BaseModel):
-    code: str
 
 
 # ────────────────────────────── 公钥 ──────────────────────────────
@@ -51,7 +40,7 @@ async def public_key():
 async def login(req: EncryptedLoginRequest, db: AsyncSession = Depends(get_db)):
     user = await get_user_by_username(db, req.username)
     if not user:
-        raise HTTPException(401, "用户名或密码错误")
+        raise HTTPException(401, "用户不存在")
 
     try:
         password = await decrypt_password(req.encrypted_password)
@@ -59,7 +48,7 @@ async def login(req: EncryptedLoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(400, "密码解密失败")
 
     if not verify_password(password, user.password_hash):
-        raise HTTPException(401, "用户名或密码错误")
+        raise HTTPException(401, "密码错误")
 
     token = create_access_token(
         user_id=user.id,
@@ -86,7 +75,7 @@ async def login(req: EncryptedLoginRequest, db: AsyncSession = Depends(get_db)):
 # ────────────────────────────── 注册（发验证邮件） ─────────────────
 
 @router.post("/register")
-async def register(req: EncryptedRegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def register(req: EncryptedRegisterRequest, db: AsyncSession = Depends(get_db)):
     # 校验用户名
     existing = await get_user_by_username(db, req.username)
     if existing:
@@ -117,18 +106,13 @@ async def register(req: EncryptedRegisterRequest, request: Request, db: AsyncSes
         "username": req.username,
         "encrypted_password": req.encrypted_password,
         "email": req.email,
+        "bio": req.bio or "",
     })
     await r.expire(f"emailRegister:{code}", 1800)
     await r.set(f"emailRegister:{req.email}", code, ex=1800)
 
-    # 发邮件 — 通过请求头重建前端地址（适配 nginx 反向代理）
-    proto = request.headers.get("X-Forwarded-Proto", request.url.scheme)
-    host = request.headers.get("X-Forwarded-Host") or request.headers.get("Host") or request.url.hostname
-    # 去掉后端内部端口 :8000，确保邮件链接指向 nginx
-    if host.endswith(":8000"):
-        host = host[:host.rfind(":")]
-    base_url = f"{proto}://{host}"
-    ok = send_verify_email(req.email, code, req.username, base_url)
+    # 发邮件 — 链接使用 .env 配置的前端地址
+    ok = await send_verify_email(req.email, code, req.username)
     if not ok:
         await r.delete(f"emailRegister:{code}")
         await r.delete(f"emailRegister:{req.email}")
@@ -157,6 +141,7 @@ async def resend_register(request: Request):
     data = await r.hgetall(f"emailRegister:{code}")
     username = data.get("username")
     encrypted_password = data.get("encrypted_password")
+    bio = data.get("bio", "")
 
     if not all([username, encrypted_password]):
         raise HTTPException(400, "注册数据不完整，请重新注册")
@@ -171,17 +156,13 @@ async def resend_register(request: Request):
         "username": username,
         "encrypted_password": encrypted_password,
         "email": email,
+        "bio": bio,
     })
     await r.expire(f"emailRegister:{new_code}", 1800)
     await r.set(f"emailRegister:{email}", new_code, ex=1800)
 
     # 发邮件
-    proto = request.headers.get("X-Forwarded-Proto", request.url.scheme)
-    host = request.headers.get("X-Forwarded-Host") or request.headers.get("Host") or request.url.hostname
-    if host.endswith(":8000"):
-        host = host[:host.rfind(":")]
-    base_url = f"{proto}://{host}"
-    ok = send_verify_email(email, new_code, username, base_url)
+    ok = await send_verify_email(email, new_code, username)
     if not ok:
         await r.delete(f"emailRegister:{new_code}")
         await r.delete(f"emailRegister:{email}")
@@ -206,6 +187,7 @@ async def verify_code(req: VerifyCodeRequest, db: AsyncSession = Depends(get_db)
     username = data.get("username")
     encrypted_password = data.get("encrypted_password")
     email = data.get("email")
+    bio = data.get("bio", "")
 
     if not all([username, encrypted_password, email]):
         raise HTTPException(400, "验证码数据不完整")
@@ -233,8 +215,9 @@ async def verify_code(req: VerifyCodeRequest, db: AsyncSession = Depends(get_db)
         password_hash=password_hash,
     )
 
-    # 写入邮箱
+    # 写入邮箱和介绍
     user.email = email
+    user.bio = bio
     await db.commit()
 
     # 标记验证码已用
@@ -244,6 +227,12 @@ async def verify_code(req: VerifyCodeRequest, db: AsyncSession = Depends(get_db)
     tag = await get_user_tag_by_name(db, "email_verified")
     if tag:
         await add_user_tag(db, user.id, tag.id)
+
+    # 移出 default 组，加入 pending_approval 组（等待管理员审核）
+    default_group = await get_group_by_name(db, "default")
+    if default_group:
+        await remove_member(db, default_group.id, user.id)
+    await add_user_to_pending(db, user.id)
 
     # 清理 Redis
     await r.delete(key)
@@ -302,6 +291,66 @@ async def verify_info(code: str = Query(...)):
 @router.get("/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
     return {"user": current_user}
+
+
+# ────────────────────────────── 审核状态 ─────────────────────────────
+
+@router.get("/approval-status")
+async def approval_status(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """查询当前用户的审核状态"""
+    if await is_user_pending(db, current_user["id"]):
+        return {"status": "pending"}
+    return {"status": "approved"}
+
+
+@router.get("/user-status")
+async def user_status(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """查询当前用户的完整状态：pending / approved / rejected / banned"""
+    from app.crud.group_user_relations import is_ban
+
+    user_id = current_user["id"]
+    if await is_user_pending(db, user_id):
+        return {"status": "pending"}
+    if await is_user_rejected(db, user_id):
+        user = await crud_get_user(db, user_id)
+        return {"status": "rejected", "reason": user.reject_reason or "", "bio": user.bio or ""}
+    if await is_ban(db, user_id):
+        return {"status": "banned"}
+    return {"status": "approved"}
+
+
+# ────────────────────────────── 审核申诉 ────────────────────────────
+
+
+@router.post("/reappeal")
+async def reappeal(
+    body: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """被拒绝的用户重新提交审核（可更新自我介绍）"""
+    user_id = current_user["id"]
+
+    if await is_ban(db, user_id):
+        raise HTTPException(403, "账号已被封禁")
+    if not await is_user_rejected(db, user_id):
+        raise HTTPException(400, "当前账号不在可申诉状态")
+
+    new_bio = (body.get("bio") or "").strip()
+    if not new_bio:
+        raise HTTPException(400, "请填写自我介绍")
+
+    ok = await reappeal_user(db, user_id, new_bio)
+    if not ok:
+        raise HTTPException(500, "申诉提交失败，请稍后重试")
+
+    return {"message": "申诉已提交，请等待管理员审核"}
 
 
 # ────────────────────────────── Git 令牌 ────────────────────────────

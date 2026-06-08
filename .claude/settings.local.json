@@ -43,7 +43,11 @@
       "Bash(nohup /e/Users/April/miniforge3/envs/PolyPlex/python.exe main.py)",
       "Bash(git -C \"D:\\\\PolyPlex\" status)",
       "Bash(git *)",
-      "Bash(Select-String \"nav\")"
+      "Bash(Select-String \"nav\")",
+      "Bash(conda env *)",
+      "Bash(pip install *)",
+      "Bash(pip list *)",
+      "Bash(pwsh -NoProfile -Command \"& { . .\\\\manage.ps1 }\")"
     ],
     "additionalDirectories": [
       "D:\\LinkNote\\Backend",

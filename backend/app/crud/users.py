@@ -159,6 +159,14 @@ async def get_user_list(
     return list(result.scalars().all())
 
 
+async def get_users_by_ids(db: AsyncSession, user_ids: list[int]) -> list[User]:
+    """批量按 ID 查询用户"""
+    if not user_ids:
+        return []
+    result = await db.execute(select(User).where(User.id.in_(user_ids)))
+    return list(result.scalars().all())
+
+
 async def count_users(db: AsyncSession) -> int:
     """统计用户数量"""
     from sqlalchemy import func
