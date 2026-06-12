@@ -120,11 +120,17 @@ from app.api.groups import router as groups_router
 from app.api.auth import router as auth_router
 from app.api.git import router as git_router
 from app.api.admin import router as admin_router
+from app.api.projects import router as projects_router
+from app.api.members import router as members_router
+from app.api.branches import router as branches_router
 app.include_router(files_router)
 app.include_router(groups_router)
 app.include_router(auth_router)
 app.include_router(git_router)
 app.include_router(admin_router)
+app.include_router(projects_router)
+app.include_router(members_router)
+app.include_router(branches_router)
 
 
 # ── OpenAPI 中文本地化 ──────────────────────────────────────────
@@ -169,6 +175,36 @@ _OPENAPI_SUMMARIES = {
     "/api/git/{repo_name}/info/refs:get": "Git 获取引用列表",
     "/api/git/{repo_name}/git-upload-pack:post": "Git 获取数据包（clone/fetch）",
     "/api/git/{repo_name}/git-receive-pack:post": "Git 接收推送数据包（push）",
+    # 项目
+    "/api/projects:post": "创建新项目",
+    "/api/projects:get": "获取项目列表（分页）",
+    "/api/projects/{project_id}:get": "获取项目详情",
+    "/api/projects/{project_id}:put": "更新项目信息",
+    "/api/projects/{project_id}:delete": "删除项目",
+    "/api/projects/{project_id}/start:post": "启动项目",
+    "/api/projects/{project_id}/close:post": "关闭项目",
+    "/api/projects/{project_id}/tags:get": "获取项目标签列表",
+    "/api/projects/{project_id}/tags:post": "给项目添加标签",
+    "/api/projects/{project_id}/tags/{tag_id}:delete": "移除项目标签",
+    "/api/projects/{project_id}/tags:put": "同步项目标签",
+    "/api/projects/tags/all:get": "获取所有可用标签",
+    "/api/projects/tags:post": "创建新标签",
+    "/api/projects/tags/{tag_id}:put": "更新标签",
+    "/api/projects/tags/{tag_id}:delete": "删除标签",
+    # 项目成员
+    "/api/projects/{project_id}/members:get": "获取项目成员列表",
+    "/api/projects/{project_id}/members:post": "添加项目成员",
+    "/api/projects/{project_id}/members/batch:post": "批量添加成员",
+    "/api/projects/{project_id}/members/{user_id}:put": "更新成员角色",
+    "/api/projects/{project_id}/members/{user_id}:delete": "移除成员",
+    # 分支
+    "/api/projects/{project_id}/branches:get": "获取分支列表",
+    "/api/projects/{project_id}/branches:post": "创建分支",
+    "/api/projects/{project_id}/branches/from-template:post": "从模板创建分支",
+    "/api/projects/{project_id}/branches/{branch_id}:get": "获取分支详情",
+    "/api/projects/{project_id}/branches/{branch_id}:put": "更新分支信息",
+    "/api/projects/{project_id}/branches/{branch_id}:delete": "删除分支",
+    "/api/projects/{project_id}/branches/{branch_id}/status:put": "更新分支状态",
     # 管理员
     "/api/admin/pending-users:get": "获取待审核用户列表",
     "/api/admin/approve-user/{user_id}:post": "审核通过用户",

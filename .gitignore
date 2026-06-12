@@ -36,5 +36,6 @@ nginx/nginx.exe
 Thumbs.db
 .DS_Store
 
-# ── Claude ──
+# ── Claude / AI Skills ──
 .claude/
+docs/superpowers/
